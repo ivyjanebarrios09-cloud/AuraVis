@@ -1,0 +1,212 @@
+"use client";
+
+import { useState, useRef, useCallback, useEffect } from "react";
+import { Camera, CameraOff, ScanLine, Loader2 } from "lucide-react";
+import { Button } from "@/components/ui/button";
+import {
+  Card,
+  CardContent,
+  CardHeader,
+  CardTitle,
+  CardDescription,
+} from "@/components/ui/card";
+import { describeScene } from "@/ai/flows/describe-scene";
+import { useToast } from "@/hooks/use-toast";
+
+export function AuraVisUI() {
+  const [isCameraOn, setIsCameraOn] = useState(false);
+  const [isLoading, setIsLoading] = useState(false);
+  const [sceneDescription, setSceneDescription] = useState(
+    "Your scene description will appear here. Turn on the camera and scan to begin."
+  );
+  const [audioSrc, setAudioSrc] = useState("");
+
+  const videoRef = useRef<HTMLVideoElement>(null);
+  const audioRef = useRef<HTMLAudioElement>(null);
+  const streamRef = useRef<MediaStream | null>(null);
+  const { toast } = useToast();
+
+  const stopCamera = useCallback(() => {
+    if (streamRef.current) {
+      streamRef.current.getTracks().forEach((track) => track.stop());
+      streamRef.current = null;
+    }
+    if (videoRef.current) {
+      videoRef.current.srcObject = null;
+    }
+    setIsCameraOn(false);
+  }, []);
+
+  const startCamera = useCallback(async () => {
+    try {
+      if (navigator.mediaDevices && navigator.mediaDevices.getUserMedia) {
+        const stream = await navigator.mediaDevices.getUserMedia({
+          video: { facingMode: "environment" },
+        });
+        streamRef.current = stream;
+        if (videoRef.current) {
+          videoRef.current.srcObject = stream;
+          videoRef.current.play();
+        }
+        setIsCameraOn(true);
+      } else {
+        toast({
+          variant: "destructive",
+          title: "Error",
+          description: "Camera not supported by this browser.",
+        });
+      }
+    } catch (err) {
+      console.error("Error accessing camera:", err);
+      toast({
+        variant: "destructive",
+        title: "Camera Access Denied",
+        description: "Please allow camera access to use this feature.",
+      });
+    }
+  }, [toast]);
+
+  const handleToggleCamera = useCallback(() => {
+    if (isCameraOn) {
+      stopCamera();
+    } else {
+      startCamera();
+    }
+  }, [isCameraOn, startCamera, stopCamera]);
+
+  const handleRescan = useCallback(async () => {
+    if (!isCameraOn || !videoRef.current || videoRef.current.readyState < 2) {
+      toast({
+        title: "Camera is not ready",
+        description:
+          "Please turn on the camera and wait for the feed to start.",
+      });
+      return;
+    }
+    setIsLoading(true);
+    setSceneDescription("Analyzing your scene...");
+    setAudioSrc("");
+
+    const canvas = document.createElement("canvas");
+    canvas.width = videoRef.current.videoWidth;
+    canvas.height = videoRef.current.videoHeight;
+    const context = canvas.getContext("2d");
+    if (context) {
+      context.drawImage(videoRef.current, 0, 0, canvas.width, canvas.height);
+      const photoDataUri = canvas.toDataURL("image/jpeg");
+
+      try {
+        const result = await describeScene({ photoDataUri });
+        setSceneDescription(result.sceneDescription);
+        setAudioSrc(result.ttsAudioDataUri);
+      } catch (error) {
+        console.error("AI analysis failed:", error);
+        setSceneDescription("Failed to analyze the scene. Please try again.");
+        toast({
+          variant: "destructive",
+          title: "Analysis Failed",
+          description: "Could not get a description for the scene.",
+        });
+      }
+    }
+    setIsLoading(false);
+  }, [isCameraOn, toast]);
+
+  useEffect(() => {
+    if (audioSrc && audioRef.current) {
+      audioRef.current.src = audioSrc;
+      audioRef.current.play().catch((e) => console.error("Audio playback failed", e));
+    }
+  }, [audioSrc]);
+
+  useEffect(() => {
+    return () => {
+      stopCamera();
+    };
+  }, [stopCamera]);
+
+  return (
+    <div className="flex flex-col items-center justify-center min-h-screen bg-background p-4 sm:p-6 lg:p-8">
+      <main className="w-full max-w-2xl mx-auto">
+        <Card className="w-full shadow-2xl rounded-2xl overflow-hidden border-2 border-primary/10 bg-card">
+          <CardHeader className="text-center p-6 bg-muted/50 border-b">
+            <CardTitle className="text-4xl font-headline font-bold text-primary">
+              AuraVis
+            </CardTitle>
+            <CardDescription className="text-lg">
+              Your AI guide to the visual world.
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="p-0">
+            <div className="aspect-video bg-muted flex items-center justify-center relative">
+              <video
+                ref={videoRef}
+                className={`w-full h-full object-cover ${
+                  isCameraOn ? "block" : "hidden"
+                }`}
+                playsInline
+                muted
+                data-ai-hint="camera feed"
+              />
+              {!isCameraOn && (
+                <div className="text-center text-muted-foreground p-8">
+                  <Camera size={64} className="mx-auto mb-4" />
+                  <p>Camera is off. Press the button to start.</p>
+                </div>
+              )}
+              {isLoading && (
+                <div className="absolute inset-0 bg-black/60 flex flex-col items-center justify-center text-white z-10 backdrop-blur-sm">
+                  <Loader2 className="animate-spin h-16 w-16 mb-4" />
+                  <p className="text-lg font-semibold">Analyzing Scene...</p>
+                </div>
+              )}
+            </div>
+            <div className="p-6 space-y-6">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <Button
+                  onClick={handleToggleCamera}
+                  size="lg"
+                  variant="outline"
+                  className="py-6 text-lg"
+                >
+                  {isCameraOn ? (
+                    <CameraOff className="mr-2 h-5 w-5" />
+                  ) : (
+                    <Camera className="mr-2 h-5 w-5" />
+                  )}
+                  {isCameraOn ? "Turn Off" : "Turn On"}
+                </Button>
+                <Button
+                  onClick={handleRescan}
+                  size="lg"
+                  disabled={!isCameraOn || isLoading}
+                  className="py-6 text-lg"
+                >
+                  {isLoading ? (
+                    <Loader2 className="mr-2 h-5 w-5 animate-spin" />
+                  ) : (
+                    <ScanLine className="mr-2 h-5 w-5" />
+                  )}
+                  Re-scan
+                </Button>
+              </div>
+              <div className="space-y-2">
+                <h2 className="text-xl font-headline font-semibold">
+                  Scene Description
+                </h2>
+                <Card className="bg-muted/50">
+                  <CardContent className="p-4">
+                    <p className="text-muted-foreground min-h-[4.5rem] flex items-center">
+                      {sceneDescription}
+                    </p>
+                  </CardContent>
+                </Card>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+        <audio ref={audioRef} className="hidden" />
+      </main>
+    </div>
+  );
+}

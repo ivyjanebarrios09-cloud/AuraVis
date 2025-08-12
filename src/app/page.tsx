@@ -1,3 +1,5 @@
+import { AuraVisUI } from '@/components/aura-vis-ui';
+
 export default function Home() {
-  return <></>;
+  return <AuraVisUI />;
 }
