@@ -42,25 +42,19 @@ const describeSceneFlow = ai.defineFlow(
     const sceneAnalysisPrompt = ai.definePrompt({
       name: 'sceneAnalysisPrompt',
       input: {schema: DescribeSceneInputSchema},
-      output: {schema: z.string().describe('Detailed textual description of the scene.')},
+      output: {schema: z.object({ sceneDescription: z.string().describe('Detailed textual description of the scene.')})},
       prompt: `You are an AI assistant that analyzes a camera view and provides a detailed description of the scene, including identified objects and the overall context.
-      Analyze the following image and provide a description:
+      Analyze the following image and provide a description in the sceneDescription field.
       {{media url=photoDataUri}}
       `,
     });
 
-    const {output: sceneDescriptionOutput} = await sceneAnalysisPrompt(input);
-    const sceneDescription = sceneDescriptionOutput!.text;
-
-    const ttsPrompt = ai.definePrompt({
-      name: 'ttsPrompt',
-      input: {schema: z.object({text: z.string()})},
-      output: {schema: z.any()},
-      prompt: `Convert the following text to speech. Return the audio data in PCM format:
-      {{{text}}}
-      `,
-    });
-
+    const {output} = await sceneAnalysisPrompt(input);
+    if (!output) {
+      throw new Error('Could not generate scene description.');
+    }
+    const sceneDescription = output.sceneDescription;
+    
     const ttsResult = await ai.generate({
       model: 'googleai/gemini-2.5-flash-preview-tts',
       config: {
@@ -115,4 +109,3 @@ async function toWav(
     writer.end();
   });
 }
-
