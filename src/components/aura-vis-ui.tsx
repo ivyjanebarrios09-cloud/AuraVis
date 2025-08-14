@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useRef, useCallback, useEffect } from "react";
-import { Camera, CameraOff, ScanLine, Loader2 } from "lucide-react";
+import { Camera, CameraOff, ScanLine, Loader2, History } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
   Card,
@@ -12,19 +12,48 @@ import {
 } from "@/components/ui/card";
 import { describeScene } from "@/ai/flows/describe-scene";
 import { useToast } from "@/hooks/use-toast";
+import { HistoryPanel } from "./history-panel";
+import type { HistoryEntry } from "./history-panel";
+import {
+  Sheet,
+  SheetContent,
+  SheetHeader,
+  SheetTitle,
+  SheetTrigger,
+} from "@/components/ui/sheet";
+
+const MAX_HISTORY_ITEMS = 10;
 
 export function AuraVisUI() {
   const [isCameraOn, setIsCameraOn] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
-  const [sceneDescription, setSceneDescription] = useState(
-    "Your scene description will appear here. Turn on the camera and scan to begin."
-  );
+  const [history, setHistory] = useState<HistoryEntry[]>([]);
   const [audioSrc, setAudioSrc] = useState("");
+  const [isHistoryOpen, setIsHistoryOpen] = useState(false);
 
   const videoRef = useRef<HTMLVideoElement>(null);
   const audioRef = useRef<HTMLAudioElement>(null);
   const streamRef = useRef<MediaStream | null>(null);
   const { toast } = useToast();
+
+  useEffect(() => {
+    try {
+      const storedHistory = localStorage.getItem("auraVisHistory");
+      if (storedHistory) {
+        setHistory(JSON.parse(storedHistory));
+      }
+    } catch (error) {
+      console.error("Failed to load history from localStorage", error);
+    }
+  }, []);
+
+  useEffect(() => {
+    try {
+      localStorage.setItem("auraVisHistory", JSON.stringify(history));
+    } catch (error) {
+      console.error("Failed to save history to localStorage", error);
+    }
+  }, [history]);
 
   const stopCamera = useCallback(() => {
     if (streamRef.current) {
@@ -84,7 +113,6 @@ export function AuraVisUI() {
       return;
     }
     setIsLoading(true);
-    setSceneDescription("Analyzing your scene...");
     setAudioSrc("");
 
     const canvas = document.createElement("canvas");
@@ -97,11 +125,16 @@ export function AuraVisUI() {
 
       try {
         const result = await describeScene({ photoDataUri });
-        setSceneDescription(result.sceneDescription);
+        const newEntry: HistoryEntry = {
+          id: Date.now().toString(),
+          description: result.sceneDescription,
+          imageUrl: photoDataUri,
+          timestamp: new Date().toISOString(),
+        };
+        setHistory((prev) => [newEntry, ...prev].slice(0, MAX_HISTORY_ITEMS));
         setAudioSrc(result.ttsAudioDataUri);
       } catch (error) {
         console.error("AI analysis failed:", error);
-        setSceneDescription("Failed to analyze the scene. Please try again.");
         toast({
           variant: "destructive",
           title: "Analysis Failed",
@@ -111,6 +144,10 @@ export function AuraVisUI() {
     }
     setIsLoading(false);
   }, [isCameraOn, toast]);
+
+  const handleClearHistory = () => {
+    setHistory([]);
+  };
 
   useEffect(() => {
     if (audioSrc && audioRef.current) {
@@ -125,17 +162,35 @@ export function AuraVisUI() {
     };
   }, [stopCamera]);
 
+  const latestDescription = history[0]?.description ?? "Your scene description will appear here. Turn on the camera and scan to begin.";
+
   return (
     <div className="flex flex-col items-center justify-center min-h-screen bg-background p-4 sm:p-6 lg:p-8">
       <main className="w-full max-w-2xl mx-auto">
         <Card className="w-full shadow-2xl rounded-2xl overflow-hidden border-2 border-primary/10 bg-card">
-          <CardHeader className="text-center p-6 bg-muted/50 border-b">
-            <CardTitle className="text-4xl font-headline font-bold text-primary">
-              AuraVis
-            </CardTitle>
-            <CardDescription className="text-lg">
-              Your AI guide to the visual world.
-            </CardDescription>
+          <CardHeader className="text-center p-6 bg-muted/50 border-b flex flex-row justify-between items-center">
+            <div className="flex-1">
+              <CardTitle className="text-4xl font-headline font-bold text-primary">
+                AuraVis
+              </CardTitle>
+              <CardDescription className="text-lg">
+                Your AI guide to the visual world.
+              </CardDescription>
+            </div>
+             <Sheet open={isHistoryOpen} onOpenChange={setIsHistoryOpen}>
+              <SheetTrigger asChild>
+                <Button variant="outline" size="icon" className="ml-4">
+                  <History className="h-5 w-5" />
+                  <span className="sr-only">View History</span>
+                </Button>
+              </SheetTrigger>
+              <SheetContent className="w-full sm:max-w-md">
+                <SheetHeader>
+                  <SheetTitle>Scan History</SheetTitle>
+                </SheetHeader>
+                <HistoryPanel history={history} onClear={handleClearHistory} />
+              </SheetContent>
+            </Sheet>
           </CardHeader>
           <CardContent className="p-0">
             <div className="aspect-video bg-muted flex items-center justify-center relative">
@@ -197,7 +252,7 @@ export function AuraVisUI() {
                 <Card className="bg-muted/50">
                   <CardContent className="p-4">
                     <p className="text-muted-foreground min-h-[4.5rem] flex items-center">
-                      {sceneDescription}
+                      {latestDescription}
                     </p>
                   </CardContent>
                 </Card>
