@@ -4,8 +4,9 @@ import { ScrollArea } from "@/components/ui/scroll-area";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import Image from "next/image";
 import { formatDistanceToNow } from "date-fns";
-import { Button } from "./ui/button";
-import { Trash2 } from "lucide-react";
+import { Button, buttonVariants } from "./ui/button";
+import { Download, Trash2 } from "lucide-react";
+import { cn } from "@/lib/utils";
 
 export interface HistoryEntry {
   id: string;
@@ -47,9 +48,19 @@ export function HistoryPanel({ history, onClear }: HistoryPanelProps) {
                 </CardHeader>
                 <CardContent className="p-4">
                     <CardDescription>{item.description}</CardDescription>
-                    <p className="text-xs text-muted-foreground mt-2">
-                        {formatDistanceToNow(new Date(item.timestamp), { addSuffix: true })}
-                    </p>
+                    <div className="flex justify-between items-center mt-2">
+                      <p className="text-xs text-muted-foreground">
+                          {formatDistanceToNow(new Date(item.timestamp), { addSuffix: true })}
+                      </p>
+                      <a
+                        href={item.imageUrl}
+                        download={`AuraVis-scan-${item.id}.jpeg`}
+                        className={cn(buttonVariants({ variant: "ghost", size: "sm" }))}
+                      >
+                        <Download className="mr-2 h-4 w-4" />
+                        <span>Save</span>
+                      </a>
+                    </div>
                 </CardContent>
               </Card>
             ))
