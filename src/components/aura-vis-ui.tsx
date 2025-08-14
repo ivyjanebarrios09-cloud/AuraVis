@@ -1,7 +1,8 @@
+
 "use client";
 
 import { useState, useRef, useCallback, useEffect } from "react";
-import { Camera, CameraOff, ScanLine, Loader2, History } from "lucide-react";
+import { Camera, CameraOff, ScanLine, Loader2, History, Volume2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
   Card,
@@ -149,6 +150,13 @@ export function AuraVisUI() {
     setHistory([]);
   };
 
+  const handleRepeatAudio = useCallback(() => {
+    if (audioRef.current) {
+      audioRef.current.currentTime = 0;
+      audioRef.current.play().catch((e) => console.error("Audio playback failed", e));
+    }
+  }, []);
+
   useEffect(() => {
     if (audioSrc && audioRef.current) {
       audioRef.current.src = audioSrc;
@@ -246,9 +254,20 @@ export function AuraVisUI() {
                 </Button>
               </div>
               <div className="space-y-2">
-                <h2 className="text-xl font-headline font-semibold">
-                  Scene Description
-                </h2>
+                <div className="flex justify-between items-center">
+                  <h2 className="text-xl font-headline font-semibold">
+                    Scene Description
+                  </h2>
+                  <Button
+                    onClick={handleRepeatAudio}
+                    variant="ghost"
+                    size="icon"
+                    disabled={!audioSrc || isLoading}
+                    aria-label="Repeat audio description"
+                  >
+                    <Volume2 className="h-5 w-5" />
+                  </Button>
+                </div>
                 <Card className="bg-muted/50">
                   <CardContent className="p-4">
                     <p className="text-muted-foreground min-h-[4.5rem] flex items-center">
