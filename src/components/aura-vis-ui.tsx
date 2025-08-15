@@ -2,7 +2,7 @@
 "use client";
 
 import { useState, useRef, useCallback, useEffect } from "react";
-import { Camera, CameraOff, ScanLine, Loader2, History, Volume2 } from "lucide-react";
+import { Camera, CameraOff, ScanLine, Loader2, History, Volume2, LogOut } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
   Card,
@@ -22,6 +22,9 @@ import {
   SheetTitle,
   SheetTrigger,
 } from "@/components/ui/sheet";
+import { useAuth } from "@/hooks/use-auth";
+import { getDatabase, ref, onValue, push, set, query, orderByChild, limitToLast } from "firebase/database";
+import { app } from "@/lib/firebase";
 
 const MAX_HISTORY_ITEMS = 10;
 
@@ -36,25 +39,30 @@ export function AuraVisUI() {
   const audioRef = useRef<HTMLAudioElement>(null);
   const streamRef = useRef<MediaStream | null>(null);
   const { toast } = useToast();
+  const { user, logout } = useAuth();
 
   useEffect(() => {
-    try {
-      const storedHistory = localStorage.getItem("auraVisHistory");
-      if (storedHistory) {
-        setHistory(JSON.parse(storedHistory));
+    if (!user) return;
+
+    const db = getDatabase(app);
+    const historyRef = ref(db, `history/${user.uid}`);
+    const historyQuery = query(historyRef, orderByChild('timestamp'), limitToLast(MAX_HISTORY_ITEMS));
+
+    const unsubscribe = onValue(historyQuery, (snapshot) => {
+      const data = snapshot.val();
+      if (data) {
+        const parsedHistory: HistoryEntry[] = Object.entries(data).map(([id, entry]: [string, any]) => ({
+          id,
+          ...entry,
+        })).sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime());
+        setHistory(parsedHistory);
+      } else {
+        setHistory([]);
       }
-    } catch (error) {
-      console.error("Failed to load history from localStorage", error);
-    }
-  }, []);
+    });
 
-  useEffect(() => {
-    try {
-      localStorage.setItem("auraVisHistory", JSON.stringify(history));
-    } catch (error) {
-      console.error("Failed to save history to localStorage", error);
-    }
-  }, [history]);
+    return () => unsubscribe();
+  }, [user]);
 
   const stopCamera = useCallback(() => {
     if (streamRef.current) {
@@ -113,6 +121,14 @@ export function AuraVisUI() {
       });
       return;
     }
+    if (!user) {
+      toast({
+        variant: 'destructive',
+        title: "Not logged in",
+        description: "You must be logged in to save scans.",
+      });
+      return;
+    }
     setIsLoading(true);
     setAudioSrc("");
 
@@ -126,13 +142,19 @@ export function AuraVisUI() {
 
       try {
         const result = await describeScene({ photoDataUri });
-        const newEntry: HistoryEntry = {
-          id: Date.now().toString(),
+        
+        const db = getDatabase(app);
+        const historyRef = ref(db, `history/${user.uid}`);
+        const newHistoryRef = push(historyRef);
+
+        const newEntry: Omit<HistoryEntry, 'id'> = {
           description: result.sceneDescription,
           imageUrl: photoDataUri,
           timestamp: new Date().toISOString(),
         };
-        setHistory((prev) => [newEntry, ...prev].slice(0, MAX_HISTORY_ITEMS));
+
+        await set(newHistoryRef, newEntry);
+        
         setAudioSrc(result.ttsAudioDataUri);
       } catch (error) {
         console.error("AI analysis failed:", error);
@@ -144,9 +166,13 @@ export function AuraVisUI() {
       }
     }
     setIsLoading(false);
-  }, [isCameraOn, toast]);
+  }, [isCameraOn, toast, user]);
 
   const handleClearHistory = () => {
+    if (!user) return;
+    const db = getDatabase(app);
+    const historyRef = ref(db, `history/${user.uid}`);
+    set(historyRef, null);
     setHistory([]);
   };
 
@@ -185,20 +211,26 @@ export function AuraVisUI() {
                 Your AI guide to the visual world.
               </CardDescription>
             </div>
-             <Sheet open={isHistoryOpen} onOpenChange={setIsHistoryOpen}>
-              <SheetTrigger asChild>
-                <Button variant="outline" size="icon" className="ml-4">
-                  <History className="h-5 w-5" />
-                  <span className="sr-only">View History</span>
-                </Button>
-              </SheetTrigger>
-              <SheetContent className="w-full sm:max-w-md">
-                <SheetHeader>
-                  <SheetTitle>Scan History</SheetTitle>
-                </SheetHeader>
-                <HistoryPanel history={history} onClear={handleClearHistory} />
-              </SheetContent>
-            </Sheet>
+            <div className="flex items-center gap-2">
+              <Sheet open={isHistoryOpen} onOpenChange={setIsHistoryOpen}>
+                <SheetTrigger asChild>
+                  <Button variant="outline" size="icon">
+                    <History className="h-5 w-5" />
+                    <span className="sr-only">View History</span>
+                  </Button>
+                </SheetTrigger>
+                <SheetContent className="w-full sm:max-w-md">
+                  <SheetHeader>
+                    <SheetTitle>Scan History</SheetTitle>
+                  </SheetHeader>
+                  <HistoryPanel history={history} onClear={handleClearHistory} />
+                </SheetContent>
+              </Sheet>
+              <Button variant="outline" size="icon" onClick={logout}>
+                <LogOut className="h-5 w-5" />
+                <span className="sr-only">Log out</span>
+              </Button>
+            </div>
           </CardHeader>
           <CardContent className="p-0">
             <div className="aspect-video bg-muted flex items-center justify-center relative">
