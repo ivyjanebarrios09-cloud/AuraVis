@@ -21,6 +21,7 @@ import { Label } from '@/components/ui/label';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { useToast } from '@/hooks/use-toast';
 import { Loader2 } from 'lucide-react';
+import { ThemeToggle } from './theme-toggle';
 
 export function AuthUI() {
   const [email, setEmail] = useState('');
@@ -53,6 +54,9 @@ export function AuthUI() {
 
   return (
     <div className="flex h-screen w-full items-center justify-center bg-background px-4">
+       <div className="absolute top-4 right-4">
+        <ThemeToggle />
+      </div>
       <div className="w-full max-w-md space-y-8">
         <div className="text-center">
           <h1 className="text-4xl font-bold text-primary">AuraVis</h1>

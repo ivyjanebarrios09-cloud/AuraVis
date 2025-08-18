@@ -25,6 +25,7 @@ import {
 import { useAuth } from "@/hooks/use-auth";
 import { getDatabase, ref, onValue, push, set, query, orderByChild, limitToLast } from "firebase/database";
 import { app } from "@/lib/firebase";
+import { ThemeToggle } from "./theme-toggle";
 
 const MAX_HISTORY_ITEMS = 10;
 
@@ -207,6 +208,7 @@ export function AuraVisUI() {
               <h1 className="text-4xl font-bold text-primary">AuraVis</h1>
             </div>
             <div className="flex items-center gap-2">
+              <ThemeToggle />
               <Sheet open={isHistoryOpen} onOpenChange={setIsHistoryOpen}>
                 <SheetTrigger asChild>
                   <Button variant="outline" size="icon">
