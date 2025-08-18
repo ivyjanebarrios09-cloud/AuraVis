@@ -17,6 +17,7 @@ const DescribeSceneInputSchema = z.object({
     .describe(
       "A photo of the scene, as a data URI that must include a MIME type and use Base64 encoding. Expected format: 'data:<mimetype>;base64,<encoded_data>'."
     ),
+  voice: z.enum(['male', 'female']).default('female').describe('The preferred voice for the audio description.'),
 });
 export type DescribeSceneInput = z.infer<typeof DescribeSceneInputSchema>;
 
@@ -41,7 +42,7 @@ const describeSceneFlow = ai.defineFlow(
   async input => {
     const sceneAnalysisPrompt = ai.definePrompt({
       name: 'sceneAnalysisPrompt',
-      input: {schema: DescribeSceneInputSchema},
+      input: {schema: z.object({photoDataUri: DescribeSceneInputSchema.shape.photoDataUri})},
       output: {schema: z.object({ sceneDescription: z.string().describe('Detailed textual description of the scene.')})},
       prompt: `You are an AI assistant that analyzes a camera view and provides a detailed description of the scene, including identified objects and the overall context.
       Analyze the following image and provide a description in the sceneDescription field.
@@ -49,11 +50,14 @@ const describeSceneFlow = ai.defineFlow(
       `,
     });
 
-    const {output} = await sceneAnalysisPrompt(input);
+    const {output} = await sceneAnalysisPrompt({ photoDataUri: input.photoDataUri });
     if (!output) {
       throw new Error('Could not generate scene description.');
     }
     const sceneDescription = output.sceneDescription;
+    
+    // Algenib is female-like, Achernar is male-like
+    const voiceName = input.voice === 'male' ? 'Achernar' : 'Algenib';
     
     const ttsResult = await ai.generate({
       model: 'googleai/gemini-2.5-flash-preview-tts',
@@ -61,7 +65,7 @@ const describeSceneFlow = ai.defineFlow(
         responseModalities: ['AUDIO'],
         speechConfig: {
           voiceConfig: {
-            prebuiltVoiceConfig: {voiceName: 'Algenib'},
+            prebuiltVoiceConfig: {voiceName: voiceName},
           },
         },
       },

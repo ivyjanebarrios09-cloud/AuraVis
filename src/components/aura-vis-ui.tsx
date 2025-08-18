@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useRef, useCallback, useEffect } from "react";
-import { Camera, CameraOff, ScanLine, Loader2, History, Volume2, LogOut } from "lucide-react";
+import { Camera, CameraOff, ScanLine, Loader2, History, Volume2, LogOut, Mic } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
   Card,
@@ -10,6 +10,13 @@ import {
   CardTitle,
   CardDescription,
 } from "@/components/ui/card";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select"
 import { describeScene } from "@/ai/flows/describe-scene";
 import { useToast } from "@/hooks/use-toast";
 import { HistoryPanel } from "./history-panel";
@@ -34,6 +41,7 @@ export function AuraVisUI() {
   const [history, setHistory] = useState<HistoryEntry[]>([]);
   const [audioSrc, setAudioSrc] = useState("");
   const [isHistoryOpen, setIsHistoryOpen] = useState(false);
+  const [voice, setVoice] = useState<"male" | "female">("female");
 
   const videoRef = useRef<HTMLVideoElement>(null);
   const audioRef = useRef<HTMLAudioElement>(null);
@@ -141,7 +149,7 @@ export function AuraVisUI() {
       const photoDataUri = canvas.toDataURL("image/jpeg");
 
       try {
-        const result = await describeScene({ photoDataUri });
+        const result = await describeScene({ photoDataUri, voice });
         
         const db = getDatabase(app);
         const historyRef = ref(db, `history/${user.uid}`);
@@ -166,7 +174,7 @@ export function AuraVisUI() {
       }
     }
     setIsLoading(false);
-  }, [isCameraOn, toast, user]);
+  }, [isCameraOn, toast, user, voice]);
 
   const handleClearHistory = () => {
     if (!user) return;
@@ -303,6 +311,23 @@ export function AuraVisUI() {
                     </p>
                   </CardContent>
                 </Card>
+              </div>
+              <div className="space-y-2">
+                  <h2 className="text-xl font-headline font-semibold">
+                    Voice Options
+                  </h2>
+                  <div className="flex items-center gap-2">
+                    <Mic className="h-5 w-5 text-muted-foreground" />
+                    <Select onValueChange={(value: "male" | "female") => setVoice(value)} defaultValue={voice}>
+                      <SelectTrigger className="w-[180px]">
+                        <SelectValue placeholder="Select a voice" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="female">Woman's Voice</SelectItem>
+                        <SelectItem value="male">Man's Voice</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
               </div>
             </div>
           </CardContent>
