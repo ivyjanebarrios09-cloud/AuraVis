@@ -203,13 +203,8 @@ export function AuraVisUI() {
       <main className="w-full max-w-2xl mx-auto">
         <Card className="w-full shadow-2xl rounded-2xl overflow-hidden border-2 border-primary/10 bg-card">
           <CardHeader className="text-center p-6 bg-muted/50 border-b flex flex-row justify-between items-center">
-            <div className="flex-1">
-              <CardTitle className="text-4xl font-headline font-bold text-primary">
-                AuraVis
-              </CardTitle>
-              <CardDescription className="text-lg">
-                Your AI guide to the visual world.
-              </CardDescription>
+            <div className="flex items-center gap-4">
+              <h1 className="text-4xl font-bold text-primary">AuraVis</h1>
             </div>
             <div className="flex items-center gap-2">
               <Sheet open={isHistoryOpen} onOpenChange={setIsHistoryOpen}>
