@@ -1,3 +1,4 @@
+
 'use server';
 
 /**
@@ -26,6 +27,7 @@ export type DescribeSceneInput = z.infer<typeof DescribeSceneInputSchema>;
 const DescribeSceneOutputSchema = z.object({
   sceneDescription: z.string().describe('A detailed description of the scene, including identified objects and the overall context.'),
   ttsAudioDataUri: z.string().describe('The audio data URI containing the spoken description of the scene.'),
+  location: z.string().optional().describe('The location of the scene in the format "Barangay, Municipality, Province".'),
 });
 export type DescribeSceneOutput = z.infer<typeof DescribeSceneOutputSchema>;
 
@@ -44,10 +46,13 @@ const describeSceneFlow = ai.defineFlow(
     const sceneAnalysisPrompt = ai.definePrompt({
       name: 'sceneAnalysisPrompt',
       input: {schema: DescribeSceneInputSchema},
-      output: {schema: z.object({ sceneDescription: z.string().describe('Detailed textual description of the scene.')})},
+      output: {schema: z.object({ 
+        sceneDescription: z.string().describe('Detailed textual description of the scene.'),
+        location: z.string().optional().describe('The location in the Philippines in the format "Barangay, Municipality, Province". This should only be populated if coordinates are provided.'),
+      })},
       prompt: `You are an AI assistant that analyzes a camera view and provides a detailed description of the scene, including identified objects and the overall context.
       {{#if latitude}}
-      The user is at latitude: {{{latitude}}} and longitude: {{{longitude}}}. Based on these coordinates, determine the location in the Philippines and include it in the description in the format "Barangay, Municipality, Province".
+      The user is at latitude: {{{latitude}}} and longitude: {{{longitude}}}. Based on these coordinates, determine the location in the Philippines and include it in the location field in the format "Barangay, Municipality, Province".
       {{/if}}
       Analyze the following image and provide a description in the sceneDescription field.
       {{media url=photoDataUri}}
@@ -58,7 +63,7 @@ const describeSceneFlow = ai.defineFlow(
     if (!output) {
       throw new Error('Could not generate scene description.');
     }
-    const sceneDescription = output.sceneDescription;
+    const { sceneDescription, location } = output;
     
     let ttsAudioDataUri = '';
     try {
@@ -87,7 +92,7 @@ const describeSceneFlow = ai.defineFlow(
     }
     
 
-    return {sceneDescription: sceneDescription, ttsAudioDataUri: ttsAudioDataUri};
+    return {sceneDescription: sceneDescription, ttsAudioDataUri: ttsAudioDataUri, location};
   }
 );
 
@@ -117,3 +122,5 @@ async function toWav(
     writer.end();
   });
 }
+
+    

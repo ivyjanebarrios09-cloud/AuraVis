@@ -1,3 +1,4 @@
+
 "use client";
 
 import { ScrollArea } from "@/components/ui/scroll-area";
@@ -5,7 +6,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import Image from "next/image";
 import { formatDistanceToNow } from "date-fns";
 import { Button, buttonVariants } from "./ui/button";
-import { Download, Trash2 } from "lucide-react";
+import { Download, MapPin, Trash2 } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 export interface HistoryEntry {
@@ -13,6 +14,7 @@ export interface HistoryEntry {
   imageUrl: string;
   description: string;
   timestamp: string;
+  location?: string;
 }
 
 interface HistoryPanelProps {
@@ -34,16 +36,22 @@ export function HistoryPanel({ history, onClear }: HistoryPanelProps) {
           {history.length > 0 ? (
             history.map((item) => (
               <Card key={item.id} className="overflow-hidden">
-                <CardHeader className="p-0">
+                <CardHeader className="p-0 relative">
                   <div className="aspect-video relative">
                      <Image
                         src={item.imageUrl}
                         alt="Scanned scene"
                         width={300}
                         height={169}
-                        className="object-cover"
+                        className="object-cover w-full h-full"
                         data-ai-hint="scanned scene history"
                       />
+                     {item.location && (
+                       <div className="absolute bottom-2 left-2 right-2 bg-black/50 text-white p-2 rounded-md text-xs backdrop-blur-sm flex items-center gap-1">
+                         <MapPin className="h-3 w-3 shrink-0" />
+                         <span className="truncate">{item.location}</span>
+                       </div>
+                     )}
                   </div>
                 </CardHeader>
                 <CardContent className="p-4">
@@ -75,3 +83,5 @@ export function HistoryPanel({ history, onClear }: HistoryPanelProps) {
     </div>
   );
 }
+
+    

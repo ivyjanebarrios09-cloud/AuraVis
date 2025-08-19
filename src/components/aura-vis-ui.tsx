@@ -1,3 +1,4 @@
+
 "use client";
 
 import { useState, useRef, useCallback, useEffect } from "react";
@@ -196,6 +197,7 @@ export function AuraVisUI() {
           description: result.sceneDescription,
           imageUrl: photoDataUri,
           timestamp: new Date().toISOString(),
+          location: result.location,
         };
 
         await set(newHistoryRef, newEntry);
@@ -365,3 +367,5 @@ export function AuraVisUI() {
     </div>
   );
 }
+
+    
