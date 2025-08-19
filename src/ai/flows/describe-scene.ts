@@ -17,14 +17,11 @@ const DescribeSceneInputSchema = z.object({
   photoDataUri: z
     .string()
     .describe(
-      "A photo of the scene, as a data URI that must include a MIME type and use Base64 encoding. Expected format: 'data:<mimetype>;base64,<encoded_data>'."
+      "A photo of the scene, as a data URI that must include a MIME type and use Base64 encoding. Expected format: 'data:<mimetype>;base64,<encoded_data>'"
     ),
-<<<<<<< HEAD
   latitude: z.number().optional().describe('The latitude of the user.'),
   longitude: z.number().optional().describe('The longitude of the user.'),
-=======
   voice: z.enum(['male', 'female']).default('female').describe('The preferred voice for the audio description.'),
->>>>>>> d9fcde887062dc42c0127a9aaf9c72f7b1bb80cc
 });
 export type DescribeSceneInput = z.infer<typeof DescribeSceneInputSchema>;
 
@@ -49,16 +46,11 @@ const describeSceneFlow = ai.defineFlow(
   async input => {
     const sceneAnalysisPrompt = ai.definePrompt({
       name: 'sceneAnalysisPrompt',
-<<<<<<< HEAD
       input: {schema: DescribeSceneInputSchema},
       output: {schema: z.object({ 
         sceneDescription: z.string().describe('Detailed textual description of the scene.'),
         location: z.string().optional().describe('The location in the Philippines in the format "Barangay, Municipality, Province". This should only be populated if coordinates are provided.'),
       })},
-=======
-      input: {schema: z.object({photoDataUri: DescribeSceneInputSchema.shape.photoDataUri})},
-      output: {schema: z.object({ sceneDescription: z.string().describe('Detailed textual description of the scene.')})},
->>>>>>> d9fcde887062dc42c0127a9aaf9c72f7b1bb80cc
       prompt: `You are an AI assistant that analyzes a camera view and provides a detailed description of the scene, including identified objects and the overall context.
       {{#if latitude}}
       The user is at latitude: {{{latitude}}} and longitude: {{{longitude}}}. Based on these coordinates, determine the location in the Philippines and include it in the location field in the format "Barangay, Municipality, Province".
@@ -68,13 +60,15 @@ const describeSceneFlow = ai.defineFlow(
       `,
     });
 
-    const {output} = await sceneAnalysisPrompt({ photoDataUri: input.photoDataUri });
+    const {output} = await sceneAnalysisPrompt(input);
     if (!output) {
       throw new Error('Could not generate scene description.');
     }
     const { sceneDescription, location } = output;
     
-<<<<<<< HEAD
+    // Algenib is female-like, Achernar is male-like
+    const voiceName = input.voice === 'male' ? 'Achernar' : 'Algenib';
+    
     let ttsAudioDataUri = '';
     try {
       const ttsResult = await ai.generate({
@@ -83,20 +77,8 @@ const describeSceneFlow = ai.defineFlow(
           responseModalities: ['AUDIO'],
           speechConfig: {
             voiceConfig: {
-              prebuiltVoiceConfig: {voiceName: 'Algenib'},
+              prebuiltVoiceConfig: {voiceName: voiceName},
             },
-=======
-    // Algenib is female-like, Achernar is male-like
-    const voiceName = input.voice === 'male' ? 'Achernar' : 'Algenib';
-    
-    const ttsResult = await ai.generate({
-      model: 'googleai/gemini-2.5-flash-preview-tts',
-      config: {
-        responseModalities: ['AUDIO'],
-        speechConfig: {
-          voiceConfig: {
-            prebuiltVoiceConfig: {voiceName: voiceName},
->>>>>>> d9fcde887062dc42c0127a9aaf9c72f7b1bb80cc
           },
         },
         prompt: sceneDescription,
@@ -144,5 +126,3 @@ async function toWav(
     writer.end();
   });
 }
-
-    

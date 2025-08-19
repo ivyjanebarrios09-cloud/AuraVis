@@ -47,12 +47,9 @@ export function AuraVisUI() {
   const [history, setHistory] = useState<HistoryEntry[]>([]);
   const [audioSrc, setAudioSrc] = useState("");
   const [isHistoryOpen, setIsHistoryOpen] = useState(false);
-<<<<<<< HEAD
   const [location, setLocation] = useState<LocationState>(null);
   const [locationError, setLocationError] = useState<string | null>(null);
-=======
   const [voice, setVoice] = useState<"male" | "female">("female");
->>>>>>> d9fcde887062dc42c0127a9aaf9c72f7b1bb80cc
 
   const videoRef = useRef<HTMLVideoElement>(null);
   const audioRef = useRef<HTMLAudioElement>(null);
@@ -209,15 +206,12 @@ export function AuraVisUI() {
       const photoDataUri = canvas.toDataURL("image/jpeg");
 
       try {
-<<<<<<< HEAD
         const result = await describeScene({
           photoDataUri,
           latitude: location?.latitude,
-          longitude: location?.longitude
+          longitude: location?.longitude,
+          voice,
         });
-=======
-        const result = await describeScene({ photoDataUri, voice });
->>>>>>> d9fcde887062dc42c0127a9aaf9c72f7b1bb80cc
         
         const db = getDatabase(app);
         const historyRef = ref(db, `history/${user.uid}`);
@@ -251,11 +245,7 @@ export function AuraVisUI() {
       }
     }
     setIsLoading(false);
-<<<<<<< HEAD
-  }, [isCameraOn, toast, user, location]);
-=======
-  }, [isCameraOn, toast, user, voice]);
->>>>>>> d9fcde887062dc42c0127a9aaf9c72f7b1bb80cc
+  }, [isCameraOn, toast, user, location, voice]);
 
   const handleClearHistory = () => {
     if (!user) return;
@@ -418,6 +408,3 @@ export function AuraVisUI() {
     </div>
   );
 }
-
-    
-    
