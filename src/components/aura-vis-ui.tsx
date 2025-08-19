@@ -46,6 +46,7 @@ export function AuraVisUI() {
   const videoRef = useRef<HTMLVideoElement>(null);
   const audioRef = useRef<HTMLAudioElement>(null);
   const streamRef = useRef<MediaStream | null>(null);
+  const locationWatcherId = useRef<number | null>(null);
   const { toast } = useToast();
   const { user, logout } = useAuth();
 
@@ -72,9 +73,19 @@ export function AuraVisUI() {
     return () => unsubscribe();
   }, [user]);
 
-  const getLocation = useCallback(() => {
+  const stopLocationWatcher = useCallback(() => {
+    if (locationWatcherId.current !== null && navigator.geolocation) {
+      navigator.geolocation.clearWatch(locationWatcherId.current);
+      locationWatcherId.current = null;
+    }
+  }, []);
+
+  const startLocationWatcher = useCallback(() => {
     if (navigator.geolocation) {
-      navigator.geolocation.getCurrentPosition(
+      // Clear any existing watcher
+      stopLocationWatcher();
+      
+      locationWatcherId.current = navigator.geolocation.watchPosition(
         (position) => {
           setLocation({
             latitude: position.coords.latitude,
@@ -90,6 +101,11 @@ export function AuraVisUI() {
             title: "Location Error",
             description: "Could not get your location. Please ensure location services are enabled.",
           });
+        },
+        {
+          enableHighAccuracy: true,
+          timeout: 5000,
+          maximumAge: 0,
         }
       );
     } else {
@@ -100,7 +116,7 @@ export function AuraVisUI() {
         description: "Geolocation is not supported by this browser.",
       });
     }
-  }, [toast]);
+  }, [toast, stopLocationWatcher]);
 
   const stopCamera = useCallback(() => {
     if (streamRef.current) {
@@ -111,7 +127,8 @@ export function AuraVisUI() {
       videoRef.current.srcObject = null;
     }
     setIsCameraOn(false);
-  }, []);
+    stopLocationWatcher();
+  }, [stopLocationWatcher]);
 
   const startCamera = useCallback(async () => {
     try {
@@ -125,7 +142,7 @@ export function AuraVisUI() {
           videoRef.current.play();
         }
         setIsCameraOn(true);
-        getLocation();
+        startLocationWatcher();
       } else {
         toast({
           variant: "destructive",
@@ -141,7 +158,7 @@ export function AuraVisUI() {
         description: "Please allow camera access to use this feature.",
       });
     }
-  }, [toast, getLocation]);
+  }, [toast, startLocationWatcher]);
 
   const handleToggleCamera = useCallback(() => {
     if (isCameraOn) {
@@ -168,8 +185,6 @@ export function AuraVisUI() {
       });
       return;
     }
-
-    getLocation(); // Refresh location on rescan
     
     setIsLoading(true);
     setAudioSrc("");
@@ -221,7 +236,7 @@ export function AuraVisUI() {
       }
     }
     setIsLoading(false);
-  }, [isCameraOn, toast, user, location, getLocation]);
+  }, [isCameraOn, toast, user, location]);
 
   const handleClearHistory = () => {
     if (!user) return;
@@ -368,4 +383,5 @@ export function AuraVisUI() {
   );
 }
 
+    
     
