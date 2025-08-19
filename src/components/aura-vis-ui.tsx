@@ -2,7 +2,7 @@
 "use client";
 
 import { useState, useRef, useCallback, useEffect } from "react";
-import { Camera, CameraOff, ScanLine, Loader2, History, Volume2, LogOut } from "lucide-react";
+import { Camera, CameraOff, ScanLine, Loader2, History, Volume2, LogOut, Mic } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
   Card,
@@ -11,6 +11,13 @@ import {
   CardTitle,
   CardDescription,
 } from "@/components/ui/card";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select"
 import { describeScene } from "@/ai/flows/describe-scene";
 import { useToast } from "@/hooks/use-toast";
 import { HistoryPanel } from "./history-panel";
@@ -40,8 +47,12 @@ export function AuraVisUI() {
   const [history, setHistory] = useState<HistoryEntry[]>([]);
   const [audioSrc, setAudioSrc] = useState("");
   const [isHistoryOpen, setIsHistoryOpen] = useState(false);
+<<<<<<< HEAD
   const [location, setLocation] = useState<LocationState>(null);
   const [locationError, setLocationError] = useState<string | null>(null);
+=======
+  const [voice, setVoice] = useState<"male" | "female">("female");
+>>>>>>> d9fcde887062dc42c0127a9aaf9c72f7b1bb80cc
 
   const videoRef = useRef<HTMLVideoElement>(null);
   const audioRef = useRef<HTMLAudioElement>(null);
@@ -198,11 +209,15 @@ export function AuraVisUI() {
       const photoDataUri = canvas.toDataURL("image/jpeg");
 
       try {
+<<<<<<< HEAD
         const result = await describeScene({
           photoDataUri,
           latitude: location?.latitude,
           longitude: location?.longitude
         });
+=======
+        const result = await describeScene({ photoDataUri, voice });
+>>>>>>> d9fcde887062dc42c0127a9aaf9c72f7b1bb80cc
         
         const db = getDatabase(app);
         const historyRef = ref(db, `history/${user.uid}`);
@@ -236,7 +251,11 @@ export function AuraVisUI() {
       }
     }
     setIsLoading(false);
+<<<<<<< HEAD
   }, [isCameraOn, toast, user, location]);
+=======
+  }, [isCameraOn, toast, user, voice]);
+>>>>>>> d9fcde887062dc42c0127a9aaf9c72f7b1bb80cc
 
   const handleClearHistory = () => {
     if (!user) return;
@@ -373,6 +392,23 @@ export function AuraVisUI() {
                     </p>
                   </CardContent>
                 </Card>
+              </div>
+              <div className="space-y-2">
+                  <h2 className="text-xl font-headline font-semibold">
+                    Voice Options
+                  </h2>
+                  <div className="flex items-center gap-2">
+                    <Mic className="h-5 w-5 text-muted-foreground" />
+                    <Select onValueChange={(value: "male" | "female") => setVoice(value)} defaultValue={voice}>
+                      <SelectTrigger className="w-[180px]">
+                        <SelectValue placeholder="Select a voice" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="female">Woman's Voice</SelectItem>
+                        <SelectItem value="male">Man's Voice</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
               </div>
             </div>
           </CardContent>
