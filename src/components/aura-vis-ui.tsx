@@ -28,12 +28,19 @@ import { ThemeToggle } from "./theme-toggle";
 
 const MAX_HISTORY_ITEMS = 10;
 
+type LocationState = {
+  latitude: number;
+  longitude: number;
+} | null;
+
 export function AuraVisUI() {
   const [isCameraOn, setIsCameraOn] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [history, setHistory] = useState<HistoryEntry[]>([]);
   const [audioSrc, setAudioSrc] = useState("");
   const [isHistoryOpen, setIsHistoryOpen] = useState(false);
+  const [location, setLocation] = useState<LocationState>(null);
+  const [locationError, setLocationError] = useState<string | null>(null);
 
   const videoRef = useRef<HTMLVideoElement>(null);
   const audioRef = useRef<HTMLAudioElement>(null);
@@ -64,6 +71,36 @@ export function AuraVisUI() {
     return () => unsubscribe();
   }, [user]);
 
+  const getLocation = useCallback(() => {
+    if (navigator.geolocation) {
+      navigator.geolocation.getCurrentPosition(
+        (position) => {
+          setLocation({
+            latitude: position.coords.latitude,
+            longitude: position.coords.longitude,
+          });
+          setLocationError(null);
+        },
+        (error) => {
+          console.error("Geolocation error:", error);
+          setLocationError(`Error: ${error.message}`);
+          toast({
+            variant: "destructive",
+            title: "Location Error",
+            description: "Could not get your location. Please ensure location services are enabled.",
+          });
+        }
+      );
+    } else {
+      setLocationError("Geolocation is not supported by this browser.");
+      toast({
+        variant: "destructive",
+        title: "Location Error",
+        description: "Geolocation is not supported by this browser.",
+      });
+    }
+  }, [toast]);
+
   const stopCamera = useCallback(() => {
     if (streamRef.current) {
       streamRef.current.getTracks().forEach((track) => track.stop());
@@ -87,6 +124,7 @@ export function AuraVisUI() {
           videoRef.current.play();
         }
         setIsCameraOn(true);
+        getLocation();
       } else {
         toast({
           variant: "destructive",
@@ -102,7 +140,7 @@ export function AuraVisUI() {
         description: "Please allow camera access to use this feature.",
       });
     }
-  }, [toast]);
+  }, [toast, getLocation]);
 
   const handleToggleCamera = useCallback(() => {
     if (isCameraOn) {
@@ -129,6 +167,9 @@ export function AuraVisUI() {
       });
       return;
     }
+
+    getLocation(); // Refresh location on rescan
+    
     setIsLoading(true);
     setAudioSrc("");
 
@@ -141,7 +182,11 @@ export function AuraVisUI() {
       const photoDataUri = canvas.toDataURL("image/jpeg");
 
       try {
-        const result = await describeScene({ photoDataUri });
+        const result = await describeScene({
+          photoDataUri,
+          latitude: location?.latitude,
+          longitude: location?.longitude
+        });
         
         const db = getDatabase(app);
         const historyRef = ref(db, `history/${user.uid}`);
@@ -155,7 +200,15 @@ export function AuraVisUI() {
 
         await set(newHistoryRef, newEntry);
         
-        setAudioSrc(result.ttsAudioDataUri);
+        if (result.ttsAudioDataUri) {
+          setAudioSrc(result.ttsAudioDataUri);
+        } else {
+            toast({
+              variant: "destructive",
+              title: "Audio Generation Failed",
+              description: "Could not generate audio description, but you can still read the text.",
+            });
+        }
       } catch (error) {
         console.error("AI analysis failed:", error);
         toast({
@@ -166,7 +219,7 @@ export function AuraVisUI() {
       }
     }
     setIsLoading(false);
-  }, [isCameraOn, toast, user]);
+  }, [isCameraOn, toast, user, location, getLocation]);
 
   const handleClearHistory = () => {
     if (!user) return;

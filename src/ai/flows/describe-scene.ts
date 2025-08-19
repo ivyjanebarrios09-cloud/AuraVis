@@ -10,6 +10,7 @@
 
 import {ai} from '@/ai/genkit';
 import {z} from 'genkit';
+import wav from 'wav';
 
 const DescribeSceneInputSchema = z.object({
   photoDataUri: z
@@ -17,6 +18,8 @@ const DescribeSceneInputSchema = z.object({
     .describe(
       "A photo of the scene, as a data URI that must include a MIME type and use Base64 encoding. Expected format: 'data:<mimetype>;base64,<encoded_data>'."
     ),
+  latitude: z.number().optional().describe('The latitude of the user.'),
+  longitude: z.number().optional().describe('The longitude of the user.'),
 });
 export type DescribeSceneInput = z.infer<typeof DescribeSceneInputSchema>;
 
@@ -30,7 +33,6 @@ export async function describeScene(input: DescribeSceneInput): Promise<Describe
   return describeSceneFlow(input);
 }
 
-import wav from 'wav';
 
 const describeSceneFlow = ai.defineFlow(
   {
@@ -44,6 +46,9 @@ const describeSceneFlow = ai.defineFlow(
       input: {schema: DescribeSceneInputSchema},
       output: {schema: z.object({ sceneDescription: z.string().describe('Detailed textual description of the scene.')})},
       prompt: `You are an AI assistant that analyzes a camera view and provides a detailed description of the scene, including identified objects and the overall context.
+      {{#if latitude}}
+      The user is at latitude: {{{latitude}}} and longitude: {{{longitude}}}. Based on these coordinates, determine the location in the Philippines and include it in the description in the format "Barangay, Municipality, Province".
+      {{/if}}
       Analyze the following image and provide a description in the sceneDescription field.
       {{media url=photoDataUri}}
       `,
@@ -55,29 +60,32 @@ const describeSceneFlow = ai.defineFlow(
     }
     const sceneDescription = output.sceneDescription;
     
-    const ttsResult = await ai.generate({
-      model: 'googleai/gemini-2.5-flash-preview-tts',
-      config: {
-        responseModalities: ['AUDIO'],
-        speechConfig: {
-          voiceConfig: {
-            prebuiltVoiceConfig: {voiceName: 'Algenib'},
+    let ttsAudioDataUri = '';
+    try {
+      const ttsResult = await ai.generate({
+        model: 'googleai/gemini-2.5-flash-preview-tts',
+        config: {
+          responseModalities: ['AUDIO'],
+          speechConfig: {
+            voiceConfig: {
+              prebuiltVoiceConfig: {voiceName: 'Algenib'},
+            },
           },
         },
-      },
-      prompt: sceneDescription,
-    });
+        prompt: sceneDescription,
+      });
 
-    if (!ttsResult.media) {
-      throw new Error('No media returned from TTS API');
+      if (ttsResult.media) {
+        const audioBuffer = Buffer.from(
+          ttsResult.media.url.substring(ttsResult.media.url.indexOf(',') + 1),
+          'base64'
+        );
+        ttsAudioDataUri = 'data:audio/wav;base64,' + (await toWav(audioBuffer));
+      }
+    } catch (e) {
+      console.error('TTS generation failed, returning empty audio.', e);
     }
-
-    const audioBuffer = Buffer.from(
-      ttsResult.media.url.substring(ttsResult.media.url.indexOf(',') + 1),
-      'base64'
-    );
-
-    const ttsAudioDataUri = 'data:audio/wav;base64,' + (await toWav(audioBuffer));
+    
 
     return {sceneDescription: sceneDescription, ttsAudioDataUri: ttsAudioDataUri};
   }
