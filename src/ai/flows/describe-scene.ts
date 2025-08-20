@@ -93,7 +93,7 @@ const textToSpeechFlow = ai.defineFlow(
     },
     async (input) => {
         // Inverted: Woman's Voice is male, Man's Voice is female.
-        const voiceName = input.voice === 'male' ? 'Achernar' : 'Algenib';
+        const voiceName = input.voice === 'male' ? 'Algenib' : 'Achernar';
         
         let ttsAudioDataUri = '';
         try {
