@@ -229,8 +229,11 @@ export function AuraVisUI() {
           description: result.sceneDescription,
           imageUrl: photoDataUri,
           timestamp: new Date().toISOString(),
-          location: result.location,
         };
+
+        if (result.location) {
+          (newEntry as HistoryEntry).location = result.location;
+        }
 
         await set(newHistoryRef, newEntry);
         
