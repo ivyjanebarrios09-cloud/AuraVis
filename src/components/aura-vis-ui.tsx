@@ -394,8 +394,8 @@ export function AuraVisUI() {
                         <SelectValue placeholder="Select a voice" />
                       </SelectTrigger>
                       <SelectContent>
-                        <SelectItem value="female">Woman's Voice</SelectItem>
-                        <SelectItem value="male">Man's Voice</SelectItem>
+                        <SelectItem value="male">Woman's Voice</SelectItem>
+                        <SelectItem value="female">Man's Voice</SelectItem>
                       </SelectContent>
                     </Select>
                   </div>
