@@ -21,19 +21,34 @@ const DescribeSceneInputSchema = z.object({
     ),
   latitude: z.number().optional().describe('The latitude of the user.'),
   longitude: z.number().optional().describe('The longitude of the user.'),
-  voice: z.enum(['male', 'female']).default('female').describe('The preferred voice for the audio description.'),
 });
 export type DescribeSceneInput = z.infer<typeof DescribeSceneInputSchema>;
 
 const DescribeSceneOutputSchema = z.object({
   sceneDescription: z.string().describe('A detailed description of the scene, including identified objects and the overall context.'),
-  ttsAudioDataUri: z.string().describe('The audio data URI containing the spoken description of the scene.'),
   location: z.string().optional().describe('The location of the scene in the format "Barangay, Municipality, Province".'),
 });
 export type DescribeSceneOutput = z.infer<typeof DescribeSceneOutputSchema>;
 
+
+const TextToSpeechInputSchema = z.object({
+  text: z.string().describe('The text to be converted to speech.'),
+  voice: z.enum(['male', 'female']).default('female').describe('The preferred voice for the audio description.'),
+});
+export type TextToSpeechInput = z.infer<typeof TextToSpeechInputSchema>;
+
+const TextToSpeechOutputSchema = z.object({
+  ttsAudioDataUri: z.string().describe('The audio data URI containing the spoken description of the scene.'),
+});
+export type TextToSpeechOutput = z.infer<typeof TextToSpeechOutputSchema>;
+
+
 export async function describeScene(input: DescribeSceneInput): Promise<DescribeSceneOutput> {
   return describeSceneFlow(input);
+}
+
+export async function textToSpeech(input: TextToSpeechInput): Promise<TextToSpeechOutput> {
+    return textToSpeechFlow(input);
 }
 
 
@@ -64,41 +79,51 @@ const describeSceneFlow = ai.defineFlow(
     if (!output) {
       throw new Error('Could not generate scene description.');
     }
-    const { sceneDescription, location } = output;
     
-    // Algenib is female-like, Achernar is male-like
-    const voiceName = input.voice === 'male' ? 'Achernar' : 'Algenib';
-    
-    let ttsAudioDataUri = '';
-    try {
-      const ttsResult = await ai.generate({
-        model: 'googleai/gemini-2.5-flash-preview-tts',
-        config: {
-          responseModalities: ['AUDIO'],
-          speechConfig: {
-            voiceConfig: {
-              prebuiltVoiceConfig: {voiceName: voiceName},
-            },
-          },
-        },
-        prompt: sceneDescription,
-      });
-
-      if (ttsResult.media) {
-        const audioBuffer = Buffer.from(
-          ttsResult.media.url.substring(ttsResult.media.url.indexOf(',') + 1),
-          'base64'
-        );
-        ttsAudioDataUri = 'data:audio/wav;base64,' + (await toWav(audioBuffer));
-      }
-    } catch (e) {
-      console.error('TTS generation failed, returning empty audio.', e);
-    }
-    
-
-    return {sceneDescription: sceneDescription, ttsAudioDataUri: ttsAudioDataUri, location};
+    return {sceneDescription: output.sceneDescription, location: output.location};
   }
 );
+
+
+const textToSpeechFlow = ai.defineFlow(
+    {
+        name: 'textToSpeechFlow',
+        inputSchema: TextToSpeechInputSchema,
+        outputSchema: TextToSpeechOutputSchema,
+    },
+    async (input) => {
+        // Inverted: Woman's Voice is male, Man's Voice is female.
+        const voiceName = input.voice === 'male' ? 'Achernar' : 'Algenib';
+        
+        let ttsAudioDataUri = '';
+        try {
+          const ttsResult = await ai.generate({
+            model: 'googleai/gemini-2.5-flash-preview-tts',
+            config: {
+              responseModalities: ['AUDIO'],
+              speechConfig: {
+                voiceConfig: {
+                  prebuiltVoiceConfig: {voiceName: voiceName},
+                },
+              },
+            },
+            prompt: input.text,
+          });
+    
+          if (ttsResult.media) {
+            const audioBuffer = Buffer.from(
+              ttsResult.media.url.substring(ttsResult.media.url.indexOf(',') + 1),
+              'base64'
+            );
+            ttsAudioDataUri = 'data:audio/wav;base64,' + (await toWav(audioBuffer));
+          }
+        } catch (e) {
+          console.error('TTS generation failed, returning empty audio.', e);
+        }
+
+        return {ttsAudioDataUri};
+    }
+)
 
 async function toWav(
   pcmData: Buffer,

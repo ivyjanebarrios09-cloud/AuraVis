@@ -18,7 +18,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select"
-import { describeScene } from "@/ai/flows/describe-scene";
+import { describeScene, textToSpeech } from "@/ai/flows/describe-scene";
 import { useToast } from "@/hooks/use-toast";
 import { HistoryPanel } from "./history-panel";
 import type { HistoryEntry } from "./history-panel";
@@ -44,8 +44,10 @@ type LocationState = {
 export function AuraVisUI() {
   const [isCameraOn, setIsCameraOn] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
+  const [isGeneratingAudio, setIsGeneratingAudio] = useState(false);
   const [history, setHistory] = useState<HistoryEntry[]>([]);
   const [audioSrc, setAudioSrc] = useState("");
+  const [currentDescription, setCurrentDescription] = useState("Your scene description will appear here. Turn on the camera and scan to begin.");
   const [isHistoryOpen, setIsHistoryOpen] = useState(false);
   const [location, setLocation] = useState<LocationState>(null);
   const [locationError, setLocationError] = useState<string | null>(null);
@@ -73,13 +75,17 @@ export function AuraVisUI() {
           ...entry,
         })).sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime());
         setHistory(parsedHistory);
+        if (parsedHistory.length > 0 && currentDescription === "Your scene description will appear here. Turn on the camera and scan to begin.") {
+          setCurrentDescription(parsedHistory[0].description);
+        }
       } else {
         setHistory([]);
       }
     });
 
     return () => unsubscribe();
-  }, [user]);
+  }, [user, currentDescription]);
+
 
   const stopLocationWatcher = useCallback(() => {
     if (locationWatcherId.current !== null && navigator.geolocation) {
@@ -195,6 +201,7 @@ export function AuraVisUI() {
     }
     
     setIsLoading(true);
+    setCurrentDescription("Analyzing scene...");
     setAudioSrc("");
 
     const canvas = document.createElement("canvas");
@@ -210,8 +217,9 @@ export function AuraVisUI() {
           photoDataUri,
           latitude: location?.latitude,
           longitude: location?.longitude,
-          voice,
         });
+        
+        setCurrentDescription(result.sceneDescription);
         
         const db = getDatabase(app);
         const historyRef = ref(db, `history/${user.uid}`);
@@ -226,17 +234,12 @@ export function AuraVisUI() {
 
         await set(newHistoryRef, newEntry);
         
-        if (result.ttsAudioDataUri) {
-          setAudioSrc(result.ttsAudioDataUri);
-        } else {
-            toast({
-              variant: "destructive",
-              title: "Audio Generation Failed",
-              description: "Could not generate audio description, but you can still read the text.",
-            });
-        }
+        // Now generate audio with the selected voice
+        await generateAudio(result.sceneDescription, voice);
+
       } catch (error) {
         console.error("AI analysis failed:", error);
+        setCurrentDescription("Could not get a description for the scene. Please try again.");
         toast({
           variant: "destructive",
           title: "Analysis Failed",
@@ -246,6 +249,46 @@ export function AuraVisUI() {
     }
     setIsLoading(false);
   }, [isCameraOn, toast, user, location, voice]);
+
+  const generateAudio = useCallback(async (text: string, selectedVoice: "male" | "female") => {
+    if (!text || text === "Your scene description will appear here. Turn on the camera and scan to begin." || text === "Analyzing scene...") {
+      return;
+    }
+
+    setIsGeneratingAudio(true);
+    setAudioSrc("");
+
+    try {
+      const result = await textToSpeech({
+        text,
+        voice: selectedVoice,
+      });
+
+      if (result.ttsAudioDataUri) {
+        setAudioSrc(result.ttsAudioDataUri);
+      } else {
+          toast({
+            variant: "destructive",
+            title: "Audio Generation Failed",
+            description: "Could not generate audio description.",
+          });
+      }
+    } catch (error) {
+      console.error("TTS generation failed:", error);
+      toast({
+        variant: "destructive",
+        title: "Audio Generation Failed",
+        description: "An error occurred while generating audio.",
+      });
+    } finally {
+      setIsGeneratingAudio(false);
+    }
+  }, [toast]);
+
+  const handleVoiceChange = (newVoice: "male" | "female") => {
+    setVoice(newVoice);
+    generateAudio(currentDescription, newVoice);
+  }
 
   const handleClearHistory = () => {
     if (!user) return;
@@ -274,8 +317,6 @@ export function AuraVisUI() {
       stopCamera();
     };
   }, [stopCamera]);
-
-  const latestDescription = history[0]?.description ?? "Your scene description will appear here. Turn on the camera and scan to begin.";
 
   return (
     <div className="flex flex-col items-center justify-center min-h-screen bg-background p-4 sm:p-6 lg:p-8">
@@ -369,7 +410,7 @@ export function AuraVisUI() {
                     onClick={handleRepeatAudio}
                     variant="ghost"
                     size="icon"
-                    disabled={!audioSrc || isLoading}
+                    disabled={!audioSrc || isLoading || isGeneratingAudio}
                     aria-label="Repeat audio description"
                   >
                     <Volume2 className="h-5 w-5" />
@@ -378,7 +419,7 @@ export function AuraVisUI() {
                 <Card className="bg-muted/50">
                   <CardContent className="p-4">
                     <p className="text-muted-foreground min-h-[4.5rem] flex items-center">
-                      {latestDescription}
+                      {currentDescription}
                     </p>
                   </CardContent>
                 </Card>
@@ -389,15 +430,16 @@ export function AuraVisUI() {
                   </h2>
                   <div className="flex items-center gap-2">
                     <Mic className="h-5 w-5 text-muted-foreground" />
-                    <Select onValueChange={(value: "male" | "female") => setVoice(value)} defaultValue={voice}>
+                    <Select onValueChange={(value: "male" | "female") => handleVoiceChange(value)} defaultValue={voice} disabled={isGeneratingAudio}>
                       <SelectTrigger className="w-[180px]">
                         <SelectValue placeholder="Select a voice" />
                       </SelectTrigger>
                       <SelectContent>
-                        <SelectItem value="male">Woman's Voice</SelectItem>
-                        <SelectItem value="female">Man's Voice</SelectItem>
+                        <SelectItem value="female">Woman's Voice</SelectItem>
+                        <SelectItem value="male">Man's Voice</SelectItem>
                       </SelectContent>
                     </Select>
+                     {isGeneratingAudio && <Loader2 className="h-5 w-5 animate-spin" />}
                   </div>
               </div>
             </div>
